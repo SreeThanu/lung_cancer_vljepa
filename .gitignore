@@ -1,0 +1,27 @@
+# Ignore data
+data/
+raw/
+processed/
+
+# Ignore checkpoints
+checkpoints/
+
+# Ignore results
+results/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large files
+*.pth
+*.npz
+*.dcm
+*.xml
+
+# MacOS
+.DS_Store
+._*
