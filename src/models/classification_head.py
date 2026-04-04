@@ -1,76 +1,68 @@
-"""Classification head for downstream task."""
+"""Classification head for downstream lung cancer prediction."""
 
 import torch
 import torch.nn as nn
-from typing import List
+from typing import List, Optional
 
 
 class ClassificationHead(nn.Module):
     """
-    Classification head for fine-tuning on lung cancer detection.
-    
+    Classification head for fine-tuning/linear-probe style training.
+
     Architecture:
-    - Global pooling of encoder outputs
+    - Global average pooling over token dimension for encoder outputs [B, N, D]
     - MLP with dropout
-    - Binary classification output
+    - Binary classification logits
     """
-    
-    def __init__(self,
-                 embed_dim: int = 768,
-                 hidden_dims: List[int] = [512, 256],
-                 num_classes: int = 2,
-                 dropout: float = 0.3):
-        """
-        Initialize classification head.
-        
-        Args:
-            embed_dim: Input dimension from encoder
-            hidden_dims: List of hidden layer dimensions
-            num_classes: Number of output classes (2 for binary)
-            dropout: Dropout rate
-        """
+
+    def __init__(
+        self,
+        embed_dim: int = 384,
+        hidden_dims: Optional[List[int]] = None,
+        num_classes: int = 2,
+        dropout: float = 0.3,
+    ):
         super().__init__()
-        
+
+        if hidden_dims is None:
+            hidden_dims = [512, 256]
+
         layers = []
         in_dim = embed_dim
-        
+
         for hidden_dim in hidden_dims:
-            layers.extend([
-                nn.Linear(in_dim, hidden_dim),
-                nn.ReLU(inplace=True),
-                nn.Dropout(dropout)
-            ])
+            layers.extend(
+                [
+                    nn.Linear(in_dim, hidden_dim),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(dropout),
+                ]
+            )
             in_dim = hidden_dim
-        
-        # Final classification layer
+
         layers.append(nn.Linear(in_dim, num_classes))
-        
         self.classifier = nn.Sequential(*layers)
-        
+
         self._init_weights()
-    
+
     def _init_weights(self):
-        """Initialize weights."""
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.trunc_normal_(m.weight, std=0.02)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-    
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.trunc_normal_(module.weight, std=0.02)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass.
-        
         Args:
-            x: Encoder outputs [B, num_patches, embed_dim]
-            
+            x: encoder features [B, N, D] or pooled features [B, D]
+
         Returns:
-            Class logits [B, num_classes]
+            logits [B, num_classes]
         """
-        # Global average pooling
-        x = x.mean(dim=1)  # [B, embed_dim]
-        
-        # Classification
-        x = self.classifier(x)  # [B, num_classes]
-        
-        return x
+        if x.ndim == 3:
+            x = x.mean(dim=1)
+        elif x.ndim != 2:
+            raise ValueError(f"Expected [B, N, D] or [B, D], got shape {tuple(x.shape)}")
+
+        return self.classifier(x)

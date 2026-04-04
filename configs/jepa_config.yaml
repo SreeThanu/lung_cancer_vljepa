@@ -2,62 +2,51 @@
 # CT-JEPA Configuration for Lung Cancer Classification
 # Research-Ready Version
 # ============================================================
-
 project:
   name: "lung_cancer_vl_jepa"
   seed: 42
   debug: false
   device: "cuda"
-  deterministic: true     # Ensures reproducibility
+  deterministic: true
   num_gpus: 1
-
 # ============================================================
 # DATA SETTINGS
 # ============================================================
-
 data:
-  raw_dir: "./data/raw/LIDC-IDRI/LIDC_DATA"
+  raw_dir: "./data/raw/LIDC-IDRI"
   processed_dir: "./data/processed"
   metadata_file: "./data/raw/metadata/annotations.csv"
-
   input_shape: [1, 96, 96, 96]
   spacing: [1.0, 1.0, 1.0]
   clip_min: -1000
   clip_max: 400
-
+  # PATCH EXTRACTION FIX (IMPORTANT)
+  num_patches: 3
+  jitter: 0
   batch_size: 6
   num_workers: 8
   pin_memory: true
-
   val_split: 0.15
   test_split: 0.15
-
-  # Optional future extension
-  cross_validation_folds: 5   # Set >1 for k-fold CV
-
-
+  cross_validation_folds: 5
 # ============================================================
 # MODEL ARCHITECTURE
 # ============================================================
-
 model:
-
   encoder:
     type: "vit_3d"
-    embed_dim: 768
-    num_heads: 12
-    depth: 12
+    embed_dim: 384      # fixed: was 768, checkpoint trained with 384
+    num_heads: 6        # fixed: was 12, must be embed_dim/64 = 6
+    depth: 6            # fixed: was 12, checkpoint has 6 layers
     patch_size: [16, 16, 16]
     mlp_ratio: 4
     dropout: 0.0
-
   predictor:
     embed_dim: 384
     num_heads: 6
     depth: 6
     mlp_ratio: 4
     dropout: 0.0
-
   masking:
     strategy: "block"
     num_blocks: 6
@@ -65,22 +54,17 @@ model:
     max_block_scale: 0.40
     aspect_ratio_min: 0.3
     aspect_ratio_max: 3.0
-
   jepa:
     ema_decay_start: 0.996
     ema_decay_end: 1.0
     ema_warmup_epochs: 10
-
   classifier:
     hidden_dims: [512, 256]
     dropout: 0.3
     num_classes: 2
-
-
 # ============================================================
 # JEPA PRETRAINING
 # ============================================================
-
 pretraining:
   epochs: 100
   learning_rate: 1.0e-4
@@ -88,52 +72,35 @@ pretraining:
   warmup_epochs: 10
   min_lr: 1.0e-6
   betas: [0.9, 0.95]
-
   amp: true
   gradient_clip_val: 1.0
   accumulation_steps: 1
-
   loss_type: "smooth_l1"
-
   save_dir: "./checkpoints/pretraining"
   save_freq: 10
   resume_from: null
-
-
 # ============================================================
 # FINE-TUNING
 # ============================================================
-
 finetuning:
   epochs: 50
   learning_rate: 5.0e-4
   weight_decay: 0.01
   warmup_epochs: 5
   min_lr: 1.0e-6
-
-  freeze_encoder: true         # TRUE = Linear probing
-                               # FALSE = Full fine-tuning
-
+  freeze_encoder: true
   layer_decay: 0.65
-
   use_class_weights: true
   amp: true
-
-  # 🔥 Newly added for stability
   save_freq: 10
   early_stopping_patience: 10
-
-
 # ============================================================
 # LOGGING & MONITORING
 # ============================================================
-
 logging:
   log_dir: "./logs"
   use_tensorboard: true
   print_freq: 10
   eval_freq: 1
-
-  # Optional extras for research
   log_grad_norm: false
   log_lr: true

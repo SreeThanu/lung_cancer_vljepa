@@ -1,23 +1,21 @@
-"""
-Medical imaging metrics for lung cancer classification.
-Research-grade evaluation metrics.
-"""
+"""Medical imaging metrics for lung cancer classification."""
 
+from typing import Dict, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
-    roc_auc_score,
-    roc_curve,
+    average_precision_score,
+    balanced_accuracy_score,
     confusion_matrix,
     f1_score,
+    matthews_corrcoef,
     precision_score,
     recall_score,
-    balanced_accuracy_score,
-    average_precision_score,
-    matthews_corrcoef,
+    roc_auc_score,
+    roc_curve,
 )
-import matplotlib.pyplot as plt
-from typing import Tuple, Dict
 
 
 # ============================================================
@@ -29,54 +27,89 @@ def compute_classification_metrics(
     y_pred: np.ndarray,
     y_proba: np.ndarray = None,
 ) -> Dict[str, float]:
-    """
-    Compute comprehensive medical classification metrics.
-    """
+    """Compute clinically relevant binary classification metrics."""
 
-    metrics = {}
+    y_true = np.asarray(y_true).astype(int)
+    y_pred = np.asarray(y_pred).astype(int)
 
-    # Basic metrics
-    metrics["accuracy"] = accuracy_score(y_true, y_pred)
-    metrics["balanced_accuracy"] = balanced_accuracy_score(y_true, y_pred)
-    metrics["precision"] = precision_score(
-        y_true, y_pred, average="binary", zero_division=0
-    )
-    metrics["recall"] = recall_score(
-        y_true, y_pred, average="binary", zero_division=0
-    )
-    metrics["f1"] = f1_score(
-        y_true, y_pred, average="binary", zero_division=0
-    )
+    metrics = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "balanced_accuracy": balanced_accuracy_score(y_true, y_pred),
+        "precision": precision_score(y_true, y_pred, average="binary", zero_division=0),
+        "recall": recall_score(y_true, y_pred, average="binary", zero_division=0),
+        "f1": f1_score(y_true, y_pred, average="binary", zero_division=0),
+    }
 
-    # Confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-    if cm.shape == (2, 2):
-        tn, fp, fn, tp = cm.ravel()
-    else:
-        # Edge case: only one class present
-        tn = fp = fn = tp = 0
+    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+    tn, fp, fn, tp = cm.ravel()
 
     metrics["sensitivity"] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     metrics["specificity"] = tn / (tn + fp) if (tn + fp) > 0 else 0.0
     metrics["ppv"] = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     metrics["npv"] = tn / (tn + fn) if (tn + fn) > 0 else 0.0
-
-    # MCC (important for imbalanced medical datasets)
     metrics["mcc"] = matthews_corrcoef(y_true, y_pred)
 
-    # ROC-AUC and PR-AUC
     if y_proba is not None:
+        y_proba = np.asarray(y_proba).astype(float)
         try:
             metrics["roc_auc"] = roc_auc_score(y_true, y_proba)
-        except:
+        except Exception:
             metrics["roc_auc"] = 0.0
 
         try:
             metrics["pr_auc"] = average_precision_score(y_true, y_proba)
-        except:
+        except Exception:
             metrics["pr_auc"] = 0.0
 
     return metrics
+
+
+# ============================================================
+# THRESHOLD TUNING
+# ============================================================
+
+def tune_threshold_from_roc(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    min_sensitivity: float = 0.80,
+) -> Dict[str, float]:
+    """
+    Tune threshold from ROC with sensitivity priority.
+
+    Strategy:
+    1. Prefer thresholds with sensitivity >= min_sensitivity
+    2. Among them, maximize specificity
+    3. If none satisfy constraint, maximize Youden's J (sensitivity + specificity - 1)
+    """
+
+    y_true = np.asarray(y_true).astype(int)
+    y_proba = np.asarray(y_proba).astype(float)
+
+    fpr, tpr, thresholds = roc_curve(y_true, y_proba)
+    specificity = 1.0 - fpr
+
+    valid = np.where(tpr >= min_sensitivity)[0]
+
+    if valid.size > 0:
+        best_idx = valid[np.argmax(specificity[valid])]
+    else:
+        youden = tpr + specificity - 1.0
+        best_idx = int(np.argmax(youden))
+
+    threshold = float(thresholds[best_idx])
+
+    return {
+        "threshold": threshold,
+        "sensitivity": float(tpr[best_idx]),
+        "specificity": float(specificity[best_idx]),
+        "roc_auc": float(roc_auc_score(y_true, y_proba)) if len(np.unique(y_true)) > 1 else 0.0,
+    }
+
+
+def predict_with_threshold(y_proba: np.ndarray, threshold: float) -> np.ndarray:
+    """Convert probabilities to binary predictions using a custom threshold."""
+    y_proba = np.asarray(y_proba).astype(float)
+    return (y_proba >= threshold).astype(int)
 
 
 # ============================================================
@@ -89,10 +122,6 @@ def plot_roc_curve(
     title: str = "ROC Curve",
     figsize: Tuple[int, int] = (8, 6),
 ):
-    """
-    Plot ROC curve.
-    """
-
     fpr, tpr, _ = roc_curve(y_true, y_proba)
     auc = roc_auc_score(y_true, y_proba)
 
@@ -121,10 +150,6 @@ def plot_confusion_matrix(
     class_names: list = None,
     figsize: Tuple[int, int] = (6, 5),
 ):
-    """
-    Plot confusion matrix.
-    """
-
     cm = confusion_matrix(y_true, y_pred)
 
     if class_names is None:
@@ -143,7 +168,7 @@ def plot_confusion_matrix(
         xlabel="Predicted Label",
     )
 
-    thresh = cm.max() / 2.0
+    thresh = cm.max() / 2.0 if cm.size else 0.0
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             ax.text(
@@ -166,10 +191,6 @@ def plot_confusion_matrix(
 # ============================================================
 
 def print_metrics_summary(metrics: Dict[str, float]):
-    """
-    Pretty formatted metric summary for publication.
-    """
-
     print("\n" + "=" * 60)
     print("LUNG CANCER CLASSIFICATION RESULTS")
     print("=" * 60)

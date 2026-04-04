@@ -112,7 +112,7 @@ def get_momentum_schedule(base_momentum: float = 0.996,
     for epoch in range(epochs):
         if epoch < warmup_epochs:
             # Linear warmup
-            momentum = base_momentum + (1.0 - base_momentum) * 0.2 * (epoch / warmup_epochs)
+            momentum = base_momentum + (final_momentum - base_momentum) * (epoch / warmup_epochs)
         else:
             # Cosine schedule
             progress = (epoch - warmup_epochs) / (epochs - warmup_epochs)
