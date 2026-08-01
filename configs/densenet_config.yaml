@@ -1,0 +1,70 @@
+project:
+  name: lung_cancer_densenet
+  seed: 42
+
+# ── Paths (all relative to get_data_dir(); resolved at runtime via paths.py) ──
+data:
+  patch_dir: processed/patches_40          # 40³ center-cropped patches
+  patch_source_size: 40                    # actual voxel size in patches_40/
+  labels_csv: processed/labels_v2.csv
+  input_shape: [1, 32, 32, 32]            # after random-crop (train) / center-crop (val)
+
+# ── DataLoader ─────────────────────────────────────────────────────────────────
+  batch_size: 32            # starting point; override with autotune_batch_size.py output
+  num_workers: 12
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 4
+  cache_in_ram: true        # ~807 patches × 40³ float32 ≈ 20 MB — trivial on 64 GB
+
+# ── Device ─────────────────────────────────────────────────────────────────────
+device: cuda                # resolver falls back: cuda → mps → cpu (see src/utils/device.py)
+
+# ── Model ──────────────────────────────────────────────────────────────────────
+model:
+  name: densenet121_3d
+  in_channels: 1
+  out_channels: 2
+  dropout: 0.0              # DenseNet121 has no native dropout; keep 0 unless overfitting
+
+# ── Training ───────────────────────────────────────────────────────────────────
+training:
+  epochs: 200
+  early_stopping_patience: 40
+  loss: cross_entropy       # standard CE; no class weights needed at 52/48 balance
+
+  optimizer: adam
+  lr: 0.001                 # published baseline; auto-scaled if batch size changes
+  lr_scaling: linear        # if autotune raises batch size: lr *= new_bs / 32
+  weight_decay: 0.0001
+
+  scheduler: step
+  lr_step_size: 30
+  lr_gamma: 0.5
+  warmup_epochs: 5
+
+  amp: true
+  amp_dtype: bfloat16       # Ampere (RTX A4000) supports native bfloat16
+  channels_last_3d: true    # memory-format optimization for 3D conv on CUDA
+
+  save_dir: checkpoints/densenet   # relative to repo root; resolved at runtime
+
+# ── Cross validation ────────────────────────────────────────────────────────────
+cv_folds: 10
+ensemble_folds: true        # average predicted probabilities across all 10 fold models
+
+# ── Test-time augmentation ─────────────────────────────────────────────────────
+tta: true
+tta_transforms:             # 8 deterministic flips of the 3 spatial axes
+  - identity
+  - flip_x
+  - flip_y
+  - flip_z
+  - flip_xy
+  - flip_xz
+  - flip_yz
+  - flip_xyz
+
+# ── Radiomics fusion (disabled; see Phase 8 / scripts/extract_radiomics.py) ────
+use_radiomics: false
+radiomics_csv: processed/radiomics_v2.csv

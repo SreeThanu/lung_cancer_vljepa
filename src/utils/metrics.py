@@ -71,29 +71,32 @@ def compute_classification_metrics(
 def tune_threshold_from_roc(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    min_sensitivity: float = 0.80,
+    min_sensitivity: float = None,
 ) -> Dict[str, float]:
     """
-    Tune threshold from ROC with sensitivity priority.
+    Tune threshold from ROC.
 
-    Strategy:
-    1. Prefer thresholds with sensitivity >= min_sensitivity
-    2. Among them, maximize specificity
-    3. If none satisfy constraint, maximize Youden's J (sensitivity + specificity - 1)
+    Strategy (default): maximize Youden's J (sensitivity + specificity - 1).
+    If min_sensitivity is set: prefer thresholds with sensitivity >= that value,
+    maximizing specificity among them; fall back to Youden's J if none qualify.
     """
 
     y_true = np.asarray(y_true).astype(int)
     y_proba = np.asarray(y_proba).astype(float)
 
+    y_proba = np.nan_to_num(y_proba, nan=0.5, posinf=1.0, neginf=0.0)
+
     fpr, tpr, thresholds = roc_curve(y_true, y_proba)
     specificity = 1.0 - fpr
+    youden = tpr + specificity - 1.0
 
-    valid = np.where(tpr >= min_sensitivity)[0]
-
-    if valid.size > 0:
-        best_idx = valid[np.argmax(specificity[valid])]
+    if min_sensitivity is not None:
+        valid = np.where(tpr >= min_sensitivity)[0]
+        if valid.size > 0:
+            best_idx = valid[np.argmax(specificity[valid])]
+        else:
+            best_idx = int(np.argmax(youden))
     else:
-        youden = tpr + specificity - 1.0
         best_idx = int(np.argmax(youden))
 
     threshold = float(thresholds[best_idx])

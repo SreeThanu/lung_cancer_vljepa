@@ -238,6 +238,67 @@ def _parse_xml_nodules(xml_path: str) -> List[Dict]:
     return nodules
 
 
+def _extract_series_uid(xml_file: Path) -> Optional[str]:
+    """Extract SeriesInstanceUid from an XML file header."""
+    try:
+        tree = ET.parse(str(xml_file))
+        root = tree.getroot()
+        for elem in root.iter():
+            if elem.tag.split("}")[-1].lower() == "seriesinstanceuid" and elem.text:
+                return elem.text.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _deduplicate_xml_by_series_uid(xml_files: List[Path]) -> List[Path]:
+    """
+    For each SeriesInstanceUid, keep exactly ONE XML file.
+
+    Rationale: the LIDC-XML-only package contains some patients' combined
+    annotation XML (all 4 reading sessions) duplicated across multiple files
+    in the tcia-lidc-xml batch subdirectories. Parsing all copies would
+    multiply the radiologist count by the number of duplicates (e.g., 5 copies
+    → num_radiologists=20 instead of 4).
+
+    Selection priority (highest first):
+      1. File path contains 'resubmit' or 'correction' (official correction)
+      2. Lexicographically first path
+
+    Files with no detectable SeriesInstanceUid are kept as-is (no dedup).
+    """
+    uid_to_files: Dict[str, List[Path]] = defaultdict(list)
+    no_uid: List[Path] = []
+
+    for f in xml_files:
+        uid = _extract_series_uid(f)
+        if uid:
+            uid_to_files[uid].append(f)
+        else:
+            no_uid.append(f)
+
+    n_total = len(xml_files)
+    n_dups = sum(len(v) - 1 for v in uid_to_files.values() if len(v) > 1)
+    if n_dups:
+        print(f"  [XML dedup] {n_dups} duplicate files removed "
+              f"({n_total} → {n_total - n_dups} files across "
+              f"{sum(1 for v in uid_to_files.values() if len(v) > 1)} series UIDs)")
+
+    selected: List[Path] = []
+    for uid, files in uid_to_files.items():
+        if len(files) == 1:
+            selected.append(files[0])
+        else:
+            # Prefer resubmit/correction; otherwise take lexicographically first
+            def _priority(f: Path) -> int:
+                keywords = ("resubmit", "correction", "correct")
+                return 0 if any(kw in str(f).lower() for kw in keywords) else 1
+            chosen = sorted(files, key=lambda f: (_priority(f), str(f)))[0]
+            selected.append(chosen)
+
+    return sorted(selected) + sorted(no_uid)
+
+
 def parse_all_xml(
     xml_dir: str,
     series_to_patient: Dict[str, str],
@@ -248,13 +309,20 @@ def parse_all_xml(
     Returns: patient_id → List[nodule_dict]
     Each element is one radiologist's annotation of one nodule.
     Spatial grouping (same physical nodule) happens in aggregate_nodules.
-    """
-    xml_files = sorted(Path(xml_dir).rglob("*.xml"))
 
-    if not xml_files:
+    Files are deduplicated by SeriesInstanceUid before parsing to prevent
+    patients whose combined XML appears multiple times in the package from
+    having their radiologist count inflated (e.g., 5 copies → 20 sessions
+    instead of 4).
+    """
+    all_files = sorted(Path(xml_dir).rglob("*.xml"))
+
+    if not all_files:
         print(f"[WARN] No XML files found in {xml_dir}")
         print("       Download LIDC-IDRI annotation XML package from TCIA and")
         print("       set preprocessing.xml_dir in jepa_config.yaml.")
+
+    xml_files = _deduplicate_xml_by_series_uid(all_files)
 
     index: Dict = defaultdict(list)
 

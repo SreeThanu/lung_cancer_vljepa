@@ -96,12 +96,36 @@ The core idea: pretrain a 3D ViT encoder using JEPA self-supervision on all avai
 
 ## Label Strategy
 
-### DO NOT use hard binary labels with a simple threshold.
+### OVERRIDE (2026-08-01): Hard binary labels ARE now used for the DenseNet classifier.
 
-### Use soft labels based on average malignancy score:
+The "DO NOT use hard binary labels" instruction below was written for the JEPA
+experiment. It is OVERRIDDEN for the DenseNet classification pipeline by an
+explicit decision made during the methodology audit (docs/methodology_audit.md).
+
+**Active protocol for DenseNet (labels_v2.csv):**
+- min_radiologists >= 3
+- benign (label=0):    avg_score <= 2.5
+- malignant (label=1): avg_score >= 3.5
+- DELETE entirely:     2.5 < avg_score < 3.5 (ambiguous, removed from train + eval)
+- soft_label column is retained in labels_v2.csv but NOT used as the training target
+- This is Option A from Section E.1 of the methodology audit
+
+**Why the override:** The previous soft-label approach mapped score-3 to soft_label=0.5,
+which the training loop then binarized at >=0.5 to label=1 (malignant). This
+mislabeled 304 genuinely ambiguous nodules as malignant, injecting 34% noise into
+the malignant class. Published 88-93% accuracy results all use the hard binary
+label with ambiguous deletion.
+
+**Do NOT revert this override** without reading the audit first.
+
+---
+
+### (Historical — applies to JEPA pretraining only)
+
+Use soft labels based on average malignancy score:
 
 ```python
-# Soft label mapping
+# Soft label mapping (for JEPA fine-tuning only — not DenseNet)
 label_map = {
     1: 0.0,   # definitely benign
     2: 0.1,   # probably benign
@@ -109,18 +133,13 @@ label_map = {
     4: 0.9,   # probably malignant
     5: 1.0    # definitely malignant
 }
-
-# Average across all radiologists who annotated the nodule
-# Then map to soft label using above
 ```
 
-### For evaluation only (not training):
-- Use hard labels: scores 1-2 → benign (0), scores 4-5 → malignant (1)
-- Exclude score-3 nodules from evaluation metrics
-- Score-3 nodules are used in training but not evaluation
-
-### Rationale
-Previous approach dropped ~740 patients by filtering aggressively. This time we keep ALL patients. Score-3 nodules contribute to JEPA pretraining (no labels needed) and to fine-tuning via soft labels (preserving uncertainty). This is supported by Zhang et al. 2022 "Re-thinking and Re-labeling LIDC-IDRI".
+### Rationale (historical)
+Previous approach dropped ~740 patients by filtering aggressively. The JEPA
+experiment kept ALL patients. Score-3 nodules contributed to JEPA pretraining
+(no labels needed) and to fine-tuning via soft labels (preserving uncertainty).
+This is supported by Zhang et al. 2022 "Re-thinking and Re-labeling LIDC-IDRI".
 
 ---
 
