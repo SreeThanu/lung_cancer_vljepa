@@ -10,7 +10,7 @@ data:
   input_shape: [1, 32, 32, 32]            # after random-crop (train) / center-crop (val)
 
 # ── DataLoader ─────────────────────────────────────────────────────────────────
-  batch_size: 32            # starting point; override with autotune_batch_size.py output
+  batch_size: 33            # starting point; override with autotune_batch_size.py output
   num_workers: 12
   pin_memory: true
   persistent_workers: true
@@ -34,7 +34,7 @@ training:
   loss: cross_entropy       # standard CE; no class weights needed at 52/48 balance
 
   optimizer: adam
-  lr: 0.001                 # published baseline; auto-scaled if batch size changes
+  lr: 0.001031                 # published baseline; auto-scaled if batch size changes
   lr_scaling: linear        # if autotune raises batch size: lr *= new_bs / 32
   weight_decay: 0.0001
 
@@ -44,7 +44,7 @@ training:
   warmup_epochs: 5
 
   amp: true
-  amp_dtype: bfloat16       # Ampere (RTX A4000) supports native bfloat16
+  amp_dtype: float16       # Ampere (RTX A4000) supports native bfloat16
   channels_last_3d: true    # memory-format optimization for 3D conv on CUDA
 
   save_dir: checkpoints/densenet   # relative to repo root; resolved at runtime

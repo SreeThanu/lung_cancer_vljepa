@@ -69,9 +69,6 @@ def compute_metrics(y_true: np.ndarray, y_prob: np.ndarray) -> Dict[str, float]:
 
 class WarmupStepLR(torch.optim.lr_scheduler.LambdaLR):
     def __init__(self, optimizer, warmup_epochs, step_size, gamma):
-        self.warmup = warmup_epochs
-        self.step   = step_size
-        self.gamma  = gamma
 
         def lr_lambda(epoch):
             if epoch < warmup_epochs:

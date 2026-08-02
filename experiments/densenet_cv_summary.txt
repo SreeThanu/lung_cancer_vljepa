@@ -1,0 +1,31 @@
+DenseNet121-3D — 10-Fold Patient-Grouped CV
+labels_v2.csv: 807 nodules, 506 patients
+Label rule: benign<=2.5, malignant>=3.5, min_rad>=3
+
+Per-fold metrics:
+  Fold  1: auc=0.9758  accuracy=0.9259  sensitivity=0.8750  specificity=0.9592  precision=0.9333  f1=0.9032
+  Fold  2: auc=0.9689  accuracy=0.9506  sensitivity=0.9762  specificity=0.9231  precision=0.9318  f1=0.9535
+  Fold  3: auc=0.9916  accuracy=0.9383  sensitivity=1.0000  specificity=0.9091  precision=0.8387  f1=0.9123
+  Fold  4: auc=0.9665  accuracy=0.8889  sensitivity=0.8780  specificity=0.9000  precision=0.9000  f1=0.8889
+  Fold  5: auc=0.9787  accuracy=0.9136  sensitivity=0.9200  specificity=0.9032  precision=0.9388  f1=0.9293
+  Fold  6: auc=0.9725  accuracy=0.9012  sensitivity=0.8095  specificity=1.0000  precision=1.0000  f1=0.8947
+  Fold  7: auc=0.9784  accuracy=0.9136  sensitivity=0.9000  specificity=0.9216  precision=0.8710  f1=0.8852
+  Fold  8: auc=0.9851  accuracy=0.9125  sensitivity=0.8750  specificity=1.0000  precision=1.0000  f1=0.9333
+  Fold  9: auc=0.9887  accuracy=0.9125  sensitivity=0.8947  specificity=0.9286  precision=0.9189  f1=0.9067
+  Fold 10: auc=0.9787  accuracy=0.8875  sensitivity=0.9286  specificity=0.8654  precision=0.7879  f1=0.8525
+
+Mean ± Std:
+  auc            0.9785 ± 0.0078
+  accuracy       0.9145 ± 0.0189
+  sensitivity    0.9057 ± 0.0516
+  specificity    0.9310 ± 0.0412
+  precision      0.9120 ± 0.0630
+  f1             0.9060 ± 0.0270
+
+Ensemble (fold-averaged probabilities):
+  auc            0.9724
+  accuracy       0.9145
+  sensitivity    0.9013
+  specificity    0.9265
+  precision      0.9180
+  f1             0.9096

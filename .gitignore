@@ -1,27 +1,76 @@
-# Ignore data
-data/
-raw/
-processed/
+# ---- Data (transferred via SSD, never git) ----
+data/raw/
+data/interim/
+data/processed/patches/
+data/processed/patches_40/
+data/processed/full_volumes/
+*.npz
+*.npy
+*.dcm
+*.mhd
+*.raw
+*.nii
+*.nii.gz
 
-# Ignore checkpoints
+# ---- Model weights ----
 checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.safetensors
 
-# Ignore results
+# ---- Run outputs ----
+experiments/*/
+!experiments/.gitkeep
 results/
+runs/
+logs/
+*.log
+wandb/
+lightning_logs/
+tensorboard/
 
-# Jupyter
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
 .ipynb_checkpoints/
 
-# Python cache
-__pycache__/
-*.pyc
+# ---- Environments ----
+venv/
+.venv/
+env/
+.conda/
+.env
+.env.local
 
-# Large files
-*.pth
-*.npz
-*.dcm
-*.xml
-
-# MacOS
+# ---- Editor / OS ----
 .DS_Store
-._*
+.AppleDouble
+.Rhistory
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- Claude Code ----
+.claude/settings.local.json
+.claude/history/
+
+# ---- Exceptions: these MUST be tracked ----
+!data/processed/labels.csv
+!data/processed/labels_v2.csv
+!data/processed/metadata.csv
+!data/processed/skipped_patients.csv
+!data/processed/radiomics_v2.csv
+!data/README.md
+
+# ---- Audit doc (not published) ----
+docs/methodology_audit.md
